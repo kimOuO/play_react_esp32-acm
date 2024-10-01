@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -32,6 +32,85 @@
 
         // 每秒自動更新影像
         setInterval(updateImage, 1000);
+    </script>
+</body>
+</html> -->
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32-CAM 即時影像與 Mediapipe 手部偵測</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+        }
+        canvas {
+            width: 100%;
+            max-width: 640px;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>ESP32-CAM 即時影像與手部偵測</h1>
+    <canvas id="outputCanvas"></canvas>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils"></script>
+    <script>
+        const canvasElement = document.getElementById('outputCanvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        
+        // 設定 ESP32-CAM 的 IP 位址，這裡應替換成你的 ESP32-CAM IP
+        const esp32CamUrl = "http://172.20.10.4/capture";
+
+        // 設置 Mediapipe 手部追蹤模型
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({
+            maxNumHands: 2,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        hands.onResults(onResults);
+
+        // 每秒從 ESP32-CAM 獲取影像並更新
+        function updateImage() {
+            const image = new Image();
+            image.crossOrigin = "anonymous"; 
+            image.src = esp32CamUrl + "?t=" + new Date().getTime();
+            image.onload = () => {
+                // 在 Canvas 上顯示來自 ESP32-CAM 的影像
+                canvasElement.width = image.width;
+                canvasElement.height = image.height;
+                canvasCtx.drawImage(image, 0, 0, image.width, image.height);
+
+                // 將影像傳入 Mediapipe 模型進行手部偵測
+                hands.send({image: image});
+            };
+        }
+
+        // 處理 Mediapipe 偵測到的手部結果
+        function onResults(results) {
+            // 繪製來自 ESP32-CAM 的影像
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+            // 如果偵測到手部，繪製手部骨架
+            if (results.multiHandLandmarks) {
+                for (const landmarks of results.multiHandLandmarks) {
+                    drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 5});
+                    drawLandmarks(canvasCtx, landmarks, {color: '#FF0000', lineWidth: 2});
+                }
+            }
+        }
+
+        // 每秒更新影像
+        setInterval(updateImage, 3000);
     </script>
 </body>
 </html>
